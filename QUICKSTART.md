@@ -31,7 +31,7 @@ echo "PERPLEXITY_API_KEY=pplx-..." >> .env
 
 ### Single Profile
 ```bash
-python production_simple.py
+python main.py
 ```
 
 Output:
@@ -68,7 +68,7 @@ Variant 1 too generic, Variant 2 weak CTA, Variant 3 too formal...
 
 ### Batch Mode
 ```python
-# Edit production_simple.py, uncomment at bottom:
+# Edit main.py, uncomment at bottom:
 
 urls = [
     "https://linkedin.com/in/person1",
@@ -79,7 +79,7 @@ batch_outreach(urls, output_file="results.csv")
 ```
 
 ```bash
-python production_simple.py
+python main.py
 ```
 
 Output CSV:
@@ -225,7 +225,7 @@ generate_message_variants: |
 
 ```
 project/
-├── production_simple.py      # Main code (340 lines)
+├── main.py      # Main code (340 lines)
 ├── config.yaml              # Models, tone, batch settings
 ├── prompts.yaml             # All prompts (easy to edit)
 ├── requirements.txt         # Dependencies
@@ -235,7 +235,7 @@ project/
 ```
 
 **Who edits what:**
-- **Developers:** `production_simple.py`, `requirements.txt`
+- **Developers:** `main.py`, `requirements.txt`
 - **Account managers:** `config.yaml` (tone, CTA style)
 - **Copywriters:** `prompts.yaml` (message rules, examples)
 - **Everyone:** Uses `results.csv` for reporting
@@ -253,7 +253,7 @@ PROMPTS = load_prompts("prompts_casual_tone.yaml")
 
 ### Show All Variants (Manual Pick)
 ```python
-# Modify production_simple.py:
+# Modify main.py:
 variants = generate_message_variants(profile, research)
 
 # Parse and show all 5
@@ -287,7 +287,7 @@ generate_message_variants: |
 ```bash
 # Make sure you're running from the right directory
 cd /path/to/ai_agent_smart_af
-python production_simple.py
+python main.py
 ```
 
 ### "⚠️ OPENAI_API_KEY not set!"
@@ -341,10 +341,10 @@ print(f"Average quality: {avg_score}/10")
 ### A/B Test Configs
 ```bash
 # Generate 50 with casual tone
-python production_simple.py --config casual.yaml --output casual.csv
+python main.py --config casual.yaml --output casual.csv
 
 # Generate 50 with professional tone
-python production_simple.py --config professional.yaml --output prof.csv
+python main.py --config professional.yaml --output prof.csv
 
 # Send both, track response rates
 # Winner = your new default!
@@ -437,10 +437,10 @@ batch_outreach(urls, "test_batch.csv")
 4. Save and re-run
 
 ### To process your list:
-1. Open `production_simple.py`
+1. Open `main.py`
 2. Find the `# Or batch mode` section at bottom
 3. Uncomment it and paste your URLs
-4. Run: `python production_simple.py`
+4. Run: `python main.py`
 5. Get results in CSV
 
 **No coding required!** ✅

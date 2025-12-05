@@ -7,9 +7,6 @@ langchain-core>=0.3.0
 # LangGraph for workflow orchestration
 langgraph>=0.2.0
 
-# LangSmith for monitoring (optional but recommended)
-langsmith>=0.1.0
-
 # Data validation
 pydantic>=2.0.0
 
@@ -18,3 +15,6 @@ pyyaml>=6.0.0
 
 # Standard dependencies
 python-dotenv>=1.0.0
+
+# Web server for Railway deployment
+gunicorn>=21.0.0

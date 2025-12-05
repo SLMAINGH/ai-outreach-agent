@@ -356,7 +356,7 @@ output:
 
 ### Save Debug Output to File
 ```bash
-python production_simple.py > debug.log 2>&1
+python main.py > debug.log 2>&1
 ```
 
 ### Debug One Profile, Then Batch
@@ -388,7 +388,7 @@ Then copy all 5 variants, send to 5 different prospects, track which gets replie
 
 **Check:**
 1. Did you save `config.yaml`?
-2. Are you running the right script? `python production_simple.py`
+2. Are you running the right script? `python main.py`
 3. Is it loading the right config? (should print "🐛 Debug mode enabled")
 
 ---

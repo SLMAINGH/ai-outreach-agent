@@ -85,7 +85,7 @@ tools:
     5. Clear CTA - obvious next step
 ```
 
-### 3. Workflow (production_simple.py)
+### 3. Workflow (main.py)
 ```python
 # Step 1: Scrape profile
 profile = scrape_linkedin_profile(url)
@@ -250,7 +250,7 @@ models:
 Want your team to manually pick instead of auto-select?
 
 ```python
-# production_simple.py - add this function
+# main.py - add this function
 
 def generate_variants_for_review(linkedin_url: str) -> Dict[str, Any]:
     """Generate variants and return all 5 for manual review."""
@@ -289,7 +289,7 @@ def generate_variants_for_review(linkedin_url: str) -> Dict[str, Any]:
 python old_version.py --urls test_urls.txt --output old.csv
 
 # Generate 10 messages WITH verbalized sampling
-python production_simple.py --urls test_urls.txt --output new.csv
+python main.py --urls test_urls.txt --output new.csv
 
 # Compare specificity, diversity, quality
 # Ask your team: which set is better?
