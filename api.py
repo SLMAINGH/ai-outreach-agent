@@ -390,9 +390,22 @@ def process_clay_webhook():
     """
 
     try:
-        data = request.json
+        # Log raw request for debugging
+        print(f"Received request - Content-Type: {request.content_type}")
+        print(f"Request data: {request.data[:500]}")  # First 500 chars
+
+        # Handle both application/json and other content types
+        if request.is_json:
+            data = request.json
+        else:
+            data = request.get_json(force=True)
+
+        print(f"Parsed data keys: {data.keys() if data else 'None'}")
 
         # Validate
+        if not data:
+            return jsonify({"error": "No JSON data received"}), 400
+
         if not data.get("records"):
             return jsonify({"error": "No records provided"}), 400
 
