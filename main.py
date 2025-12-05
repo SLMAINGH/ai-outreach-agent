@@ -125,9 +125,10 @@ def mock_linkedin_scraper(url: str) -> Dict[str, str]:
     }
 
 
-# ===== CORE FUNCTIONS (no @tool decorator) =====
+# ===== TOOLS =====
 
-def scrape_linkedin_profile_fn(linkedin_url: str) -> str:
+@tool
+def scrape_linkedin_profile(linkedin_url: str) -> str:
     """Scrape LinkedIn profile data."""
     profile = mock_linkedin_scraper(linkedin_url)
     return f"""NAME: {profile['name']}
@@ -138,7 +139,8 @@ EXPERIENCE: {profile['experience']}
 RECENT ACTIVITY: {profile['recent_activity']}"""
 
 
-def research_company_fn(company: str, title: str = "", context: str = "") -> str:
+@tool
+def research_company(company: str, title: str = "", context: str = "") -> str:
     """Research company using Perplexity."""
     perplexity = ChatPerplexity(
         model=CONFIG["models"]["research"]["model"],
@@ -157,7 +159,8 @@ def research_company_fn(company: str, title: str = "", context: str = "") -> str
     return result.content
 
 
-def generate_message_variants_fn(profile_data: str, research_data: str) -> str:
+@tool
+def generate_message_variants(profile_data: str, research_data: str) -> str:
     """Generate 5 diverse message variants using Verbalized Sampling."""
     llm = ChatOpenAI(
         model=CONFIG["models"]["generator"]["model"],
@@ -192,7 +195,8 @@ def generate_message_variants_fn(profile_data: str, research_data: str) -> str:
     return result.content
 
 
-def select_best_message_fn(variants: str, profile_data: str, research_data: str) -> str:
+@tool
+def select_best_message(variants: str, profile_data: str, research_data: str) -> str:
     """Select the best message from variants."""
     llm = ChatOpenAI(
         model=CONFIG["models"]["agent"]["model"],
@@ -221,32 +225,6 @@ WHY THIS ONE (Score: {result.score}/10):
 
 WHY NOT OTHERS:
 {result.rejected_reasons}"""
-
-
-# ===== TOOL WRAPPERS (for agent use) =====
-
-@tool
-def scrape_linkedin_profile(linkedin_url: str) -> str:
-    """Scrape LinkedIn profile data."""
-    return scrape_linkedin_profile_fn(linkedin_url)
-
-
-@tool
-def research_company(company: str, title: str = "", context: str = "") -> str:
-    """Research company using Perplexity."""
-    return research_company_fn(company, title, context)
-
-
-@tool
-def generate_message_variants(profile_data: str, research_data: str) -> str:
-    """Generate 5 diverse message variants using Verbalized Sampling."""
-    return generate_message_variants_fn(profile_data, research_data)
-
-
-@tool
-def select_best_message(variants: str, profile_data: str, research_data: str) -> str:
-    """Select the best message from variants."""
-    return select_best_message_fn(variants, profile_data, research_data)
 
 
 # ===== TOOLS FOR BATCH PROCESSING =====
