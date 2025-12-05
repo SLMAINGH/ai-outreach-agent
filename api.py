@@ -381,18 +381,22 @@ def process_clay_webhook():
     """
     Main endpoint for Clay webhooks.
 
-    Expected payload:
-    {
-        "records": [...],  # Array of employee objects
-        "numberOfResults": 6,
-        "webhook_url": "https://your-webhook.com"
-    }
+    Expected:
+    - Header: X-Webhook-URL with callback URL
+    - Body: The full lookup result from Clay (with records and numberOfResults)
     """
 
     try:
         # Log raw request for debugging
         print(f"Received request - Content-Type: {request.content_type}")
+        print(f"Headers: {dict(request.headers)}")
         print(f"Request data: {request.data[:500]}")  # First 500 chars
+
+        # Get webhook URL from header
+        webhook_url = request.headers.get("X-Webhook-URL") or request.headers.get("Webhook-URL")
+
+        if not webhook_url:
+            return jsonify({"error": "X-Webhook-URL header is required"}), 400
 
         # Handle both application/json and other content types
         if request.is_json:
@@ -409,16 +413,11 @@ def process_clay_webhook():
         if not data.get("records"):
             return jsonify({"error": "No records provided"}), 400
 
-        if not data.get("webhook_url"):
-            return jsonify({"error": "webhook_url is required"}), 400
-
         # Parse employees
         employees = [Employee(**record) for record in data["records"]]
 
         # Get company name (assume all same company)
         company_name = employees[0].companyName if employees else "Unknown"
-
-        webhook_url = data["webhook_url"]
 
         # Add to queue
         company_queue.put((company_name, employees, webhook_url))
