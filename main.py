@@ -17,9 +17,9 @@ from pydantic import BaseModel, Field
 from langchain_openai import ChatOpenAI
 from langchain_perplexity import ChatPerplexity
 from langchain_core.messages import HumanMessage
+from langchain_core.callbacks.base import BaseCallbackHandler
 from langchain.agents import create_agent
 from langchain.tools import tool
-from langchain.callbacks.base import BaseCallbackHandler
 import langchain
 
 
