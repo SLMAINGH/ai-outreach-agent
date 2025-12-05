@@ -1,0 +1,177 @@
+# ===== SYSTEM PROMPTS =====
+
+supervisor:
+  system: |
+    You generate personalized LinkedIn outreach messages.
+
+    WORKFLOW (execute in exact order):
+    1. scrape_linkedin_profile(url) - get profile data
+    2. research_company(company_name, context=profile_insights) - research their company
+    3. generate_message_variants(profile_data, research_data) - create MULTIPLE message options
+    4. select_best_message(variants) - pick the best one
+
+    IMPORTANT:
+    - If a tool fails, try ONE more time with adjusted input
+    - Pass rich context between tools (don't just pass names)
+    - We use Verbalized Sampling to generate diverse, non-generic messages
+    - The selector will pick the best variant
+
+    Return ONLY the final selected message when done.
+
+
+# ===== TOOL PROMPTS =====
+
+tools:
+  research_company: |
+    Research {company} for personalized B2B outreach.
+    {context}
+
+    Provide:
+    - Recent funding/news (last 6 months with dates)
+    - Current hiring status (are they hiring? what roles?)
+    - Key challenges or pain points in their industry
+    - Recent product launches or company pivots
+    - Specific actionable insights (not generic)
+
+    Be detailed with numbers, dates, and concrete facts.
+    Focus on information that would be relevant for outreach to a {title}.
+
+
+  # ===== VERBALIZED SAMPLING FOR MESSAGE GENERATION =====
+  # This generates 3-5 diverse variants to avoid generic templates
+  generate_message_variants: |
+    <instructions>
+    Generate 5 different personalized LinkedIn outreach messages, each within a separate <response> tag.
+    Each <response> must include a <message> and a numeric <probability>.
+    Please sample at random from the tails of the distribution, such that the probability of each response is less than 0.10.
+
+    This means: Generate DIVERSE messages - different hooks, different angles, different tones.
+    Avoid generating 5 similar messages. Each should feel distinct.
+    </instructions>
+
+    PROFILE DATA:
+    {profile_data}
+
+    COMPANY RESEARCH:
+    {research_data}
+
+    STRICT RULES FOR EACH MESSAGE:
+    1. Reference 2+ SPECIFIC details from profile (not just name/title)
+    2. Reference 1+ SPECIFIC insight from research (with details like dates/numbers)
+    3. 3-4 sentences maximum, under {max_words} words total
+    4. Tone: {tone}
+    5. Clear, actionable CTA: {cta_style}
+    6. NO buzzwords, NO fluff, NO generic templates
+
+    VARY THESE ACROSS THE 5 MESSAGES:
+    - Opening hook (question vs observation vs compliment)
+    - Which profile detail you emphasize
+    - Which research insight you lead with
+    - Tone/formality level
+    - CTA style (coffee vs quick call vs email exchange)
+
+    For each response, also track:
+    - profile_details_used: list of specific profile details referenced
+    - research_insights_used: list of specific research insights used
+    - hook_type: what type of opening (question/observation/compliment/insight)
+
+
+  # ===== SELECTOR PROMPT =====
+  # Picks the best message from the variants
+  select_best_message: |
+    You are a message quality selector. Pick the BEST message from these variants.
+
+    VARIANTS:
+    {variants}
+
+    PROFILE:
+    {profile_data}
+
+    RESEARCH:
+    {research_data}
+
+    SELECTION CRITERIA (rank by importance):
+    1. **Specificity** - Uses concrete details, not generic statements
+    2. **Relevance** - Research insight is timely and relevant
+    3. **Natural tone** - Sounds like a human, not a template
+    4. **Strong hook** - Opens with something compelling
+    5. **Clear CTA** - Obvious next step
+
+    AVOID SELECTING:
+    - Generic messages that could apply to anyone
+    - Overly formal/stiff language
+    - Messages with buzzwords or fluff
+    - Messages that feel sales-y or spammy
+    - Messages that are too long
+
+    Return the selected message in this format:
+    <selected>
+      <message>[the full message text]</message>
+      <reason>[1-2 sentence explanation of why you picked this one]</reason>
+      <rejected_reasons>[why you didn't pick the others]</rejected_reasons>
+      <score>[1-10 quality score]</score>
+    </selected>
+
+
+# ===== MESSAGE RULES (used in prompts) =====
+
+message_rules:
+  max_words: 100
+  min_sentences: 3
+  max_sentences: 4
+  required_profile_references: 2
+  required_research_references: 1
+  tone: "genuine and conversational"  # Options: genuine, casual, professional, friendly, direct
+  cta_style: "casual coffee chat"  # Options: casual coffee, quick call, conference meet, email exchange, open-ended
+
+
+# ===== TONE VARIATIONS =====
+# Different tones you can use (swap into message_rules.tone)
+
+tones:
+  genuine: "genuine and conversational - like reaching out to a peer"
+  casual: "casual and friendly - like a warm intro from a mutual friend"
+  professional: "professional but approachable - respectful of their seniority"
+  direct: "direct and to-the-point - no fluff, just value proposition"
+  curious: "curious and inquisitive - asking thoughtful questions"
+
+
+# ===== CTA STYLES =====
+# Different call-to-action approaches
+
+cta_styles:
+  casual_coffee: "casual coffee chat or virtual coffee"
+  quick_call: "15-min quick call or Zoom"
+  conference_meet: "meet at upcoming conference or event"
+  email_exchange: "continue conversation over email"
+  open_ended: "open to whatever works for them (let them choose)"
+  specific_collab: "specific collaboration or partnership idea"
+
+
+# ===== EXAMPLES (for reference) =====
+# Show these to your team to calibrate on quality
+
+good_examples:
+  - message: |
+      Hey Sarah! Saw your AI Infrastructure Summit talk on scaling vector DBs—the query optimization
+      for 1B+ QPS was mind-blowing. DataScale's $50M Series B seems perfectly timed for your hiring
+      push. Coffee in SF to chat about productionizing LLM infrastructure?
+    why_good: "Specific talk reference, specific funding amount/date, natural tone, clear CTA"
+
+  - message: |
+      Sarah - your post about RAG scaling challenges hit home. We're wrestling with the same vector DB
+      bottlenecks at 100M+ queries/day. Would love to compare notes on what you learned at Meta.
+      Quick call next week?
+    why_good: "References specific post topic, shares similar challenge, peer-to-peer tone, easy CTA"
+
+
+bad_examples:
+  - message: |
+      Hi Sarah, I noticed you're a VP at DataScale AI and wanted to reach out about potential
+      synergies. Would love to connect and explore how we can add value to your organization.
+    why_bad: "Generic, buzzwords (synergies, add value), no specific details, sales-y"
+
+  - message: |
+      Dear Ms. Chen, I hope this message finds you well. I wanted to take a moment to congratulate
+      you on your impressive career trajectory...
+    why_bad: "Too formal, filler phrases, no substance, template-y"

@@ -1,0 +1,81 @@
+# ===== MODEL CONFIGURATION =====
+models:
+  # Main agent model (for orchestration)
+  agent:
+    provider: "openai"
+    model: "gpt-4o"
+    temperature: 0
+
+  # Message generation (most important - use best model)
+  # This generates 5 variants using Verbalized Sampling
+  generator:
+    provider: "openai"
+    model: "gpt-4o"  # Change to "gpt-4o-mini" to save 10x cost
+    temperature: 0.7  # Slightly creative for natural, diverse messages
+
+  # Company research (online search)
+  research:
+    provider: "perplexity"
+    model: "sonar-pro"
+
+
+# ===== MESSAGE RULES =====
+# These are passed into the prompts
+message_rules:
+  max_words: 100
+  min_sentences: 3
+  max_sentences: 4
+  required_profile_references: 2
+  required_research_references: 1
+
+  # Options: "genuine and conversational", "casual and friendly",
+  #          "professional but approachable", "direct and to-the-point"
+  tone: "genuine and conversational"
+
+  # CTA style - what kind of next step?
+  # Options: "casual coffee chat", "15-min quick call", "meet at conference",
+  #          "continue over email", "open to whatever works"
+  cta_style: "casual coffee chat"
+
+
+# ===== BATCH PROCESSING =====
+batch:
+  # Delay between profiles to avoid rate limits (seconds)
+  delay_seconds: 2
+
+  # Stop entire batch on first error?
+  stop_on_error: false
+
+  # Save results after each profile (safer for long batches)
+  incremental_save: true
+
+
+# ===== OUTPUT OPTIONS =====
+output:
+  # Show metadata (profile refs, research refs, why selected)?
+  include_metadata: true
+
+  # Verbose logging during execution?
+  verbose: true
+
+  # Debug mode - shows ALL LLM calls, prompts, tool executions
+  debug_mode: false  # Set to true to see everything
+
+  # Show all 5 message variants before selection
+  show_all_variants: false  # Set to true to see all options
+
+  # Show prompts being sent to LLMs
+  show_prompts: false  # Set to true when debugging prompts
+
+  # Show detailed tool call info
+  show_tool_calls: false  # Set to true to see tool execution details
+
+  # Export format for batch results
+  export_format: "csv"  # Options: csv, json, markdown
+
+
+# ===== API KEYS (optional - prefer env vars) =====
+# Leave empty to use environment variables (recommended)
+api_keys:
+  openai: ""  # Uses OPENAI_API_KEY from env
+  perplexity: ""  # Uses PERPLEXITY_API_KEY from env
