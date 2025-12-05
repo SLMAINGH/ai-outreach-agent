@@ -125,10 +125,9 @@ def mock_linkedin_scraper(url: str) -> Dict[str, str]:
     }
 
 
-# ===== TOOLS =====
+# ===== CORE FUNCTIONS (no @tool decorator) =====
 
-@tool
-def scrape_linkedin_profile(linkedin_url: str) -> str:
+def scrape_linkedin_profile_fn(linkedin_url: str) -> str:
     """Scrape LinkedIn profile data."""
     profile = mock_linkedin_scraper(linkedin_url)
     return f"""NAME: {profile['name']}
@@ -139,8 +138,7 @@ EXPERIENCE: {profile['experience']}
 RECENT ACTIVITY: {profile['recent_activity']}"""
 
 
-@tool
-def research_company(company: str, title: str = "", context: str = "") -> str:
+def research_company_fn(company: str, title: str = "", context: str = "") -> str:
     """Research company using Perplexity."""
     perplexity = ChatPerplexity(
         model=CONFIG["models"]["research"]["model"],
@@ -159,8 +157,7 @@ def research_company(company: str, title: str = "", context: str = "") -> str:
     return result.content
 
 
-@tool
-def generate_message_variants(profile_data: str, research_data: str) -> str:
+def generate_message_variants_fn(profile_data: str, research_data: str) -> str:
     """Generate 5 diverse message variants using Verbalized Sampling."""
     llm = ChatOpenAI(
         model=CONFIG["models"]["generator"]["model"],
@@ -195,8 +192,7 @@ def generate_message_variants(profile_data: str, research_data: str) -> str:
     return result.content
 
 
-@tool
-def select_best_message(variants: str, profile_data: str, research_data: str) -> str:
+def select_best_message_fn(variants: str, profile_data: str, research_data: str) -> str:
     """Select the best message from variants."""
     llm = ChatOpenAI(
         model=CONFIG["models"]["agent"]["model"],
@@ -227,6 +223,83 @@ WHY NOT OTHERS:
 {result.rejected_reasons}"""
 
 
+# ===== TOOL WRAPPERS (for agent use) =====
+
+@tool
+def scrape_linkedin_profile(linkedin_url: str) -> str:
+    """Scrape LinkedIn profile data."""
+    return scrape_linkedin_profile_fn(linkedin_url)
+
+
+@tool
+def research_company(company: str, title: str = "", context: str = "") -> str:
+    """Research company using Perplexity."""
+    return research_company_fn(company, title, context)
+
+
+@tool
+def generate_message_variants(profile_data: str, research_data: str) -> str:
+    """Generate 5 diverse message variants using Verbalized Sampling."""
+    return generate_message_variants_fn(profile_data, research_data)
+
+
+@tool
+def select_best_message(variants: str, profile_data: str, research_data: str) -> str:
+    """Select the best message from variants."""
+    return select_best_message_fn(variants, profile_data, research_data)
+
+
+# ===== TOOLS FOR BATCH PROCESSING =====
+
+@tool
+def score_and_select_employees(employees_json: str, company_research: str, top_n: int = 3) -> str:
+    """Score all employees and return top N for outreach."""
+    import json
+
+    employees = json.loads(employees_json)
+
+    llm = ChatOpenAI(model=CONFIG["models"]["agent"]["model"], temperature=0)
+
+    employees_text = "\n\n".join([
+        f"""EMPLOYEE {i+1}:
+Name: {e.get('fullName', 'N/A')}
+Title: {e.get('title', 'N/A')}
+Summary: {e.get('summary', 'N/A')[:500]}
+Title Description: {e.get('titleDescription', 'N/A')[:500]}"""
+        for i, e in enumerate(employees)
+    ])
+
+    prompt = f"""You are evaluating employees at a company to determine the BEST person(s) to approach for a B2B outreach campaign.
+
+COMPANY RESEARCH:
+{company_research}
+
+EMPLOYEES:
+{employees_text}
+
+SCORING CRITERIA (0-100):
+- Seniority/Decision-making power (0-30 points)
+- Role relevance to our offering (0-25 points)
+- Profile completeness/engagement signals (0-20 points)
+- Likelihood to respond (0-25 points)
+
+For EACH employee, provide:
+1. Score (0-100)
+2. Brief reasoning (2-3 sentences)
+
+Focus on: CTOs, VPs of Digital/Tech/Marketing, Directors of key functions.
+Avoid: Generic titles, incomplete profiles, junior roles.
+
+Return as JSON array with top {top_n} employees:
+[
+  {{"vmid": "emp_id", "name": "Full Name", "score": 85, "reasoning": "CTO with strong digital transformation background..."}},
+  ...
+]"""
+
+    result = llm.invoke([HumanMessage(content=prompt)])
+    return result.content
+
+
 # ===== AGENT =====
 
 def create_outreach_agent():
@@ -242,9 +315,52 @@ def create_outreach_agent():
             scrape_linkedin_profile,
             research_company,
             generate_message_variants,
-            select_best_message
+            select_best_message,
+            score_and_select_employees
         ],
         system_prompt=PROMPTS["supervisor"]["system"]
+    )
+
+
+def create_batch_agent():
+    """Create agent for processing company batches from Clay."""
+    llm = ChatOpenAI(
+        model=CONFIG["models"]["agent"]["model"],
+        temperature=CONFIG["models"]["agent"]["temperature"]
+    )
+
+    batch_prompt = """You are an AI outreach agent that processes company employee lists from Clay.
+
+Your workflow:
+1. Research the company ONCE using research_company tool
+2. Score all employees using score_and_select_employees tool (pass company research)
+3. For each TOP employee (score >= 70):
+   - Generate personalized message using generate_message_variants and select_best_message
+4. Return results for ALL employees in JSON format:
+[
+  {{
+    "vmid": "emp_id",
+    "fullName": "Name",
+    "selected": true/false,
+    "selection_reasoning": "Score: X/100. Reason...",
+    "message": "personalized message" (if selected),
+    "message_score": 8 (if selected)
+  }},
+  ...
+]
+
+Be efficient: Research company ONCE, not per employee.
+"""
+
+    return create_agent(
+        model=llm,
+        tools=[
+            research_company,
+            score_and_select_employees,
+            generate_message_variants,
+            select_best_message
+        ],
+        system_prompt=batch_prompt
     )
 
 
