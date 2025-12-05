@@ -15,6 +15,7 @@ from pydantic import BaseModel, Field
 from langchain_openai import ChatOpenAI
 from langchain_perplexity import ChatPerplexity
 from langchain_core.messages import HumanMessage
+from langchain_core.callbacks.base import BaseCallbackHandler
 import langchain
 
 # Import from main.py
@@ -23,6 +24,46 @@ from main import (
     load_prompts,
     create_batch_agent
 )
+
+
+# ===== VERBOSE CALLBACK HANDLER =====
+
+class VerboseCallbackHandler(BaseCallbackHandler):
+    """Callback to show agent's work in real-time."""
+
+    def on_tool_start(self, serialized, input_str, **kwargs):
+        tool_name = serialized.get("name", "tool")
+        print(f"\n{'='*60}")
+        print(f"🔧 TOOL START: {tool_name}")
+        print(f"{'='*60}")
+        print(f"Input:\n{input_str}")
+        print(f"{'='*60}")
+
+    def on_tool_end(self, output, **kwargs):
+        print(f"\n{'='*60}")
+        print(f"✓ TOOL COMPLETED")
+        print(f"{'='*60}")
+        print(f"Output:\n{output}")
+        print(f"{'='*60}\n")
+
+    def on_tool_error(self, error, **kwargs):
+        print(f"\n❌ TOOL ERROR: {error}\n")
+
+    def on_llm_start(self, serialized, prompts, **kwargs):
+        model_name = serialized.get("name", "LLM")
+        print(f"\n{'='*60}")
+        print(f"💭 LLM START: {model_name}")
+        print(f"{'='*60}")
+        print(f"Prompt:\n{prompts[0] if prompts else 'N/A'}")
+        print(f"{'='*60}")
+
+    def on_llm_end(self, response, **kwargs):
+        output = response.generations[0][0].text if response.generations else ""
+        print(f"\n{'='*60}")
+        print(f"✓ LLM COMPLETED")
+        print(f"{'='*60}")
+        print(f"Response:\n{output}")
+        print(f"{'='*60}\n")
 
 
 # ===== LOAD CONFIG =====
@@ -145,7 +186,13 @@ Remember: Research company ONCE, not per employee. Be efficient."""
         print(f"   Step 3: Agent will generate messages for top {top_n}")
         print()
 
-        result = agent.invoke({"messages": [{"role": "user", "content": task}]})
+        # Create callback handler for verbose logging
+        callback = VerboseCallbackHandler()
+
+        result = agent.invoke(
+            {"messages": [{"role": "user", "content": task}]},
+            config={"callbacks": [callback]}
+        )
 
         # Get agent's response
         agent_output = result["messages"][-1].content
