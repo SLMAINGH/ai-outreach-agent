@@ -18,6 +18,57 @@ supervisor:
 
     Return ONLY the final selected message when done.
 
+batch_agent:
+  system: |
+    You are an AI outreach agent that processes company employee lists from Clay.
+
+    Your workflow:
+    1. Research the company ONCE using research_company tool
+    2. Score all employees using score_and_select_employees tool (pass company research)
+    3. For each TOP employee (score >= 70):
+       - Generate personalized message using generate_message_variants and select_best_message
+    4. Return results for ALL employees in JSON format:
+    [
+      {{
+        "vmid": "emp_id",
+        "fullName": "Name",
+        "selected": true/false,
+        "selection_reasoning": "Score: X/100. Reason...",
+        "message": "personalized message" (if selected),
+        "message_score": 8 (if selected)
+      }},
+      ...
+    ]
+
+    Be efficient: Research company ONCE, not per employee.
+
+  task: |
+    Process these employees from {company_name}.
+
+    EMPLOYEES DATA:
+    {employees_json}
+
+    YOUR TASK:
+    1. Research {company_name} (once)
+    2. Score all {num_employees} employees and select top {top_n}
+    3. Generate personalized messages for selected employees (score >= 70)
+    4. Return results for ALL employees in this JSON format:
+    [
+      {{
+        "vmid": "...",
+        "fullName": "...",
+        "title": "...",
+        "selected": true/false,
+        "selection_reasoning": "Score: X/100. Reason...",
+        "message": "personalized message" (only if selected),
+        "message_score": 8 (only if selected),
+        "error": "" (if any)
+      }},
+      ...
+    ]
+
+    Remember: Research company ONCE, not per employee. Be efficient.
+
 
 # ===== TOOL PROMPTS =====
 
@@ -111,6 +162,35 @@ tools:
       <rejected_reasons>[why you didn't pick the others]</rejected_reasons>
       <score>[1-10 quality score]</score>
     </selected>
+
+  # ===== EMPLOYEE SCORING PROMPT =====
+  score_and_select_employees: |
+    You are evaluating employees at a company to determine the BEST person(s) to approach for a B2B outreach campaign.
+
+    COMPANY RESEARCH:
+    {company_research}
+
+    EMPLOYEES:
+    {employees_text}
+
+    SCORING CRITERIA (0-100):
+    - Seniority/Decision-making power (0-30 points)
+    - Role relevance to our offering (0-25 points)
+    - Profile completeness/engagement signals (0-20 points)
+    - Likelihood to respond (0-25 points)
+
+    For EACH employee, provide:
+    1. Score (0-100)
+    2. Brief reasoning (2-3 sentences)
+
+    Focus on: CTOs, VPs of Digital/Tech/Marketing, Directors of key functions.
+    Avoid: Generic titles, incomplete profiles, junior roles.
+
+    Return as JSON array with top {top_n} employees:
+    [
+      {{"vmid": "emp_id", "name": "Full Name", "score": 85, "reasoning": "CTO with strong digital transformation background..."}},
+      ...
+    ]
 
 
 # ===== MESSAGE RULES (used in prompts) =====

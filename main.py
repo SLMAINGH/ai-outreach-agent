@@ -247,32 +247,13 @@ Title Description: {e.get('titleDescription', 'N/A')[:500]}"""
         for i, e in enumerate(employees)
     ])
 
-    prompt = f"""You are evaluating employees at a company to determine the BEST person(s) to approach for a B2B outreach campaign.
-
-COMPANY RESEARCH:
-{company_research}
-
-EMPLOYEES:
-{employees_text}
-
-SCORING CRITERIA (0-100):
-- Seniority/Decision-making power (0-30 points)
-- Role relevance to our offering (0-25 points)
-- Profile completeness/engagement signals (0-20 points)
-- Likelihood to respond (0-25 points)
-
-For EACH employee, provide:
-1. Score (0-100)
-2. Brief reasoning (2-3 sentences)
-
-Focus on: CTOs, VPs of Digital/Tech/Marketing, Directors of key functions.
-Avoid: Generic titles, incomplete profiles, junior roles.
-
-Return as JSON array with top {top_n} employees:
-[
-  {{"vmid": "emp_id", "name": "Full Name", "score": 85, "reasoning": "CTO with strong digital transformation background..."}},
-  ...
-]"""
+    # Format prompt from template
+    prompt_template = PROMPTS["tools"]["score_and_select_employees"]
+    prompt = prompt_template.format(
+        company_research=company_research,
+        employees_text=employees_text,
+        top_n=top_n
+    )
 
     result = llm.invoke([HumanMessage(content=prompt)])
     return result.content
@@ -307,29 +288,6 @@ def create_batch_agent():
         temperature=CONFIG["models"]["agent"]["temperature"]
     )
 
-    batch_prompt = """You are an AI outreach agent that processes company employee lists from Clay.
-
-Your workflow:
-1. Research the company ONCE using research_company tool
-2. Score all employees using score_and_select_employees tool (pass company research)
-3. For each TOP employee (score >= 70):
-   - Generate personalized message using generate_message_variants and select_best_message
-4. Return results for ALL employees in JSON format:
-[
-  {{
-    "vmid": "emp_id",
-    "fullName": "Name",
-    "selected": true/false,
-    "selection_reasoning": "Score: X/100. Reason...",
-    "message": "personalized message" (if selected),
-    "message_score": 8 (if selected)
-  }},
-  ...
-]
-
-Be efficient: Research company ONCE, not per employee.
-"""
-
     return create_agent(
         model=llm,
         tools=[
@@ -338,7 +296,7 @@ Be efficient: Research company ONCE, not per employee.
             generate_message_variants,
             select_best_message
         ],
-        system_prompt=batch_prompt
+        system_prompt=PROMPTS["batch_agent"]["system"]
     )
 
 

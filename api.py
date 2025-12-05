@@ -152,31 +152,15 @@ def process_company_batch(company_name: str, employees: List[Employee], webhook_
 
     # Task prompt for agent
     top_n = CONFIG.get("api", {}).get("max_targets_per_company", 3)
-    task = f"""Process these employees from {company_name}.
 
-EMPLOYEES DATA:
-{employees_json}
-
-YOUR TASK:
-1. Research {company_name} (once)
-2. Score all {len(employees)} employees and select top {top_n}
-3. Generate personalized messages for selected employees (score >= 70)
-4. Return results for ALL employees in this JSON format:
-[
-  {{
-    "vmid": "...",
-    "fullName": "...",
-    "title": "...",
-    "selected": true/false,
-    "selection_reasoning": "Score: X/100. Reason...",
-    "message": "personalized message" (only if selected),
-    "message_score": 8 (only if selected),
-    "error": "" (if any)
-  }},
-  ...
-]
-
-Remember: Research company ONCE, not per employee. Be efficient."""
+    # Format prompt from template
+    prompt_template = PROMPTS["batch_agent"]["task"]
+    task = prompt_template.format(
+        company_name=company_name,
+        employees_json=employees_json,
+        num_employees=len(employees),
+        top_n=top_n
+    )
 
     try:
         # Invoke agent with verbose output
