@@ -109,6 +109,11 @@ def process_company_batch(company_name: str, employees: List[Employee], webhook_
     print(f"🤖 Creating batch agent...")
     agent = create_batch_agent()
 
+    # Enable verbose logging for this agent execution
+    import langchain
+    original_debug = langchain.debug
+    langchain.debug = True
+
     # Task prompt for agent
     top_n = CONFIG.get("api", {}).get("max_targets_per_company", 3)
     task = f"""Process these employees from {company_name}.
@@ -138,14 +143,23 @@ YOUR TASK:
 Remember: Research company ONCE, not per employee. Be efficient."""
 
     try:
-        # Invoke agent
+        # Invoke agent with verbose output
         print(f"🚀 Agent processing...")
+        print(f"   Step 1: Agent will research {company_name}")
+        print(f"   Step 2: Agent will score {len(employees)} employees")
+        print(f"   Step 3: Agent will generate messages for top {top_n}")
+        print()
+
         result = agent.invoke({"messages": [{"role": "user", "content": task}]})
 
         # Get agent's response
         agent_output = result["messages"][-1].content
-        print(f"✓ Agent completed")
-        print(f"Agent output preview: {agent_output[:500]}...")
+        print(f"\n✓ Agent completed")
+        print(f"\n{'='*60}")
+        print(f"AGENT FULL OUTPUT:")
+        print(f"{'='*60}")
+        print(agent_output)
+        print(f"{'='*60}\n")
 
         # Parse JSON response
         try:
@@ -199,6 +213,10 @@ Remember: Research company ONCE, not per employee. Be efficient."""
                 error=f"Agent error: {str(e)}"
             )
             send_to_webhook(webhook_url, error_result)
+
+    finally:
+        # Restore debug setting
+        langchain.debug = original_debug
 
 
 # ===== QUEUE WORKER =====
