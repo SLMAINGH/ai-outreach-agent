@@ -1,350 +1,517 @@
-# 🤖 AI Outreach Agent
+# AI Outreach Agent
 
-**LinkedIn outreach automation with Verbalized Sampling** - generates 5 diverse message variants, picks the best one.
-
-Perfect for agencies: non-devs can edit prompts/config, no code changes needed.
+Multi-agent system for LinkedIn outreach with Verbalized Sampling and quality feedback loops.
 
 ---
 
-## ✨ Features
+## Architecture
 
-- 🎯 **Verbalized Sampling** - Generates 5 unique variants per profile, supervisor picks best (1.6-2.1x more creative)
-- 📝 **YAML Configs** - All prompts in `prompts.yaml`, all settings in `config.yaml` (non-dev friendly)
-- 🔧 **Debug Options** - See all variants, prompts, tool calls via config flags
-- 📊 **Batch Processing** - Process 100s of profiles, export to CSV
-- 🏢 **Agency-Ready** - Different configs per client, easy A/B testing
-- 🔌 **Clay Integration** - Flask API for webhooks, auto-scores employees, queues companies
+### Agent System
+
+**Supervisor Pattern:** Central agent coordinates specialized sub-agents, evaluates outputs, and can retry with feedback.
+
+**Sub-Agents:**
+1. **Scraper Agent** - Extracts LinkedIn profile data
+2. **Research Agent** - Company research via Perplexity (real-time web search)
+3. **Generator Agent** - Produces 5 message variants using Verbalized Sampling
+4. **Selector Agent** - Evaluates variants and picks best
+
+**Feedback Loop:** Supervisor can reject outputs, provide specific feedback, and re-invoke sub-agents with improved prompts.
+
+### Verbalized Sampling
+
+Addresses LLM "mode collapse" (tendency to generate generic responses):
+- Generate 5 variants with explicit probability distributions
+- Sample from distribution tails (p < 0.10) for creative outputs
+- Supervisor evaluates all variants against quality criteria
+- Results in 1.6-2.1x more creative outputs ([research](https://www.verbalized-sampling.com))
+
+### Quality Gates
+
+Each step can be rejected and retried:
+```
+scrape_profile() → review() → [PASS: continue | REJECT: retry with feedback]
+research_company() → review() → [PASS: continue | REJECT: retry with enhanced query]
+generate_variants() → review() → [PASS: continue | REJECT: retry with stricter criteria]
+```
+
+Supervisor tracks attempts and can:
+- Modify prompts based on failure analysis
+- Adjust parameters (temperature, sampling strategy)
+- Provide explicit examples of desired output
+- Escalate to human review after N attempts
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
-### Standalone Mode (CLI)
+### Standalone Mode
 
-1. **Install**
 ```bash
 pip install -r requirements.txt
-```
-
-2. **Set API Keys**
-```bash
 export OPENAI_API_KEY="sk-..."
 export PERPLEXITY_API_KEY="pplx-..."
-```
-
-3. **Run**
-```bash
 python main.py
 ```
 
 ### API Mode (Clay Integration)
 
-1. **Deploy to Railway**
-   - Connect GitHub repo
-   - Set environment variables (API keys)
-   - Deploy
+```bash
+# Deploy to Railway
+git push
 
-2. **Configure Clay**
-   - Add HTTP API enrichment
-   - URL: `https://your-app.railway.app/process`
-   - Include `webhook_url` in request body
+# API receives employee lists, scores them, generates messages
+# Returns results via webhooks
+```
 
-3. **Receive Results**
-   - Get scored employees + messages via webhook
-   - One webhook call per employee
-
-See **[API.md](API.md)** for full Clay integration guide
+See [API.md](API.md) for Clay integration details.
 
 ---
 
-## 📖 Documentation
+## Configuration
 
-- **[API.md](API.md)** - Clay integration guide (Flask API, webhooks)
-- **[QUICKSTART.md](QUICKSTART.md)** - Installation, usage, configuration
-- **[DEBUG_OPTIONS.md](DEBUG_OPTIONS.md)** - See agent thinking, all 5 variants
-- **[VERBALIZED_SAMPLING.md](VERBALIZED_SAMPLING.md)** - How it works, why it's better
+All settings in `config.yaml` and `prompts.yaml`:
 
----
-
-## 🎯 How It Works
-
-### 1. Scrape LinkedIn Profile
-```
-NAME: Sarah Chen
-TITLE: VP Engineering
-COMPANY: DataScale AI
-RECENT ACTIVITY: Posted about scaling vector DBs for RAG
-```
-
-### 2. Research Company (Perplexity)
-```
-- DataScale AI raised $50M Series B (Nov 2024)
-- Hiring: 10 open engineering roles
-- Challenge: Scaling vector DB queries to 1B+ QPS
-```
-
-### 3. Generate 5 Variants (Verbalized Sampling)
-```
-Variant 1: "Hey Sarah! Saw your AI Summit talk on vector DBs..."
-Variant 2: "Your post about RAG scaling hit home..."
-Variant 3: "Sarah - that 1B+ QPS stat was wild..."
-Variant 4: "DataScale's $50M Series B seems timed perfectly..."
-Variant 5: "Your Meta experience with rec systems is impressive..."
-```
-
-### 4. Supervisor Picks Best
-```
-SELECTED: Variant 1 (Score: 9/10)
-WHY: Most specific references (named conference, cited metric,
-included funding amount). Natural tone. Clear CTA.
-```
-
----
-
-## ⚙️ Configuration
-
-### Change Tone (config.yaml)
-```yaml
-message_rules:
-  tone: "casual and friendly"  # or "professional but approachable"
-  cta_style: "15-min quick call"  # or "casual coffee chat"
-```
-
-### Change Model (config.yaml)
+**Models:**
 ```yaml
 models:
-  generator:
-    model: "gpt-4o-mini"  # 10x cheaper than gpt-4o
+  agent: {model: "gpt-4o", temperature: 0}
+  generator: {model: "gpt-4o", temperature: 0.7}
+  research: {model: "sonar-pro"}
 ```
 
-### Edit Prompts (prompts.yaml)
+**Message Rules:**
 ```yaml
-tools:
-  generate_message_variants: |
-    Generate 5 diverse messages...
-
-    RULES:
-    1. Reference 3+ profile details  # Change this!
-    2. Under 75 words  # Was 100
+message_rules:
+  max_words: 100
+  required_profile_references: 2
+  required_research_references: 1
+  tone: "genuine and conversational"
 ```
 
-**No code changes needed!** Your account manager can tweak these.
-
----
-
-## 🐛 Debug Options
-
-See what's happening under the hood:
-
+**API Settings:**
 ```yaml
-# config.yaml
+api:
+  max_targets_per_company: 3
+  min_score_threshold: 70
+  delay_between_companies: 5
+```
+
+**Debug Options:**
+```yaml
 output:
-  show_all_variants: true  # See all 5 options before selection
-  debug_mode: true         # Full debug (all LLM calls)
-  show_tool_calls: true    # See tool execution flow
+  debug_mode: false           # Full LangChain debug output
+  show_all_variants: false    # Display all 5 variants before selection
+  show_prompts: false         # Display prompts sent to LLMs
+  show_tool_calls: false      # Display tool execution details
 ```
-
-Full guide: **[DEBUG_OPTIONS.md](DEBUG_OPTIONS.md)**
 
 ---
 
-## 📦 Batch Processing
+## Agent Workflow
 
+### 1. Profile Extraction
 ```python
-# Uncomment in main.py:
-urls = [
-    "https://linkedin.com/in/person1",
-    "https://linkedin.com/in/person2",
-    "https://linkedin.com/in/person3"
-]
-batch_outreach(urls, output_file="results.csv")
+profile = scrape_linkedin_profile(url)
+# Returns: name, title, company, experience, recent activity
 ```
 
-Output CSV:
-```csv
-url,success,message,error
-https://linkedin.com/in/person1,True,"Hey John! Saw your post...",
-https://linkedin.com/in/person2,True,"Sarah - your talk was...",
-https://linkedin.com/in/person3,False,,Rate limit exceeded
+### 2. Company Research
+```python
+research = research_company(company, context=profile_insights)
+# Perplexity searches: funding, hiring, challenges, tech initiatives
 ```
 
----
+### 3. Message Generation (Verbalized Sampling)
+```python
+variants = generate_message_variants(profile, research)
+# Generates 5 diverse variants:
+# - Different hooks (question/observation/compliment)
+# - Different profile details emphasized
+# - Different research insights
+# - Different formality levels
+# - Different CTA styles
+```
 
-## 🏗️ Tech Stack
+**Example Variants:**
+```
+Variant 1 (p=0.08): "Saw your AI Summit talk on vector DBs..."
+Variant 2 (p=0.06): "Your post about RAG scaling hit home..."
+Variant 3 (p=0.09): "That 1B+ QPS optimization stat was wild..."
+Variant 4 (p=0.05): "DataScale's $50M Series B timing seems perfect..."
+Variant 5 (p=0.07): "Your Meta experience with rec systems at scale..."
+```
 
-- **LangChain v1** - Agent framework with `create_agent`
-- **OpenAI GPT-4o** - Message generation (5 variants via Verbalized Sampling)
-- **Perplexity Sonar** - Company research with real-time web search
-- **Pydantic** - Structured outputs and validation
-- **YAML** - Config management (non-dev friendly)
+### 4. Supervisor Selection
+```python
+selected = select_best_message(variants, profile, research)
+# Evaluates against:
+# - Specificity (concrete details, not generic)
+# - Relevance (timely, contextual)
+# - Natural tone (human, not templated)
+# - Strong hook (compelling opening)
+# - Clear CTA (obvious next step)
+```
 
----
-
-## 💰 Cost
-
-**Per Profile (with Verbalized Sampling):**
-- GPT-4o: ~$0.025 (5 variants + selection)
-- GPT-4o-mini: ~$0.0025 (10x cheaper)
-- Perplexity: ~$0.01
-
-**100 profiles:** $2.50-3.50 (GPT-4o) or $0.35 (GPT-4o-mini)
-
----
-
-## 🎓 Why Verbalized Sampling?
-
-**Problem:** LLMs have "mode collapse" - always give the most generic response.
-
-**Solution:** Generate 5 diverse variants from "tail of distribution" (low-probability, creative options), then pick best.
-
-**Result:** 1.6-2.1x more creative outputs while maintaining quality ([source](https://www.verbalized-sampling.com))
-
-### Example Output
+**Output:**
 ```
 SELECTED MESSAGE:
-Hey Sarah! Saw your AI Infrastructure Summit talk on scaling
-vector DBs—the query optimization for 1B+ QPS was mind-blowing.
-DataScale's $50M Series B seems perfectly timed for your hiring
-push. Coffee in SF to chat about productionizing LLM infrastructure?
+Saw your AI Summit talk on vector DBs—the 1B+ QPS optimization was impressive.
+DataScale's $50M Series B seems timed for your hiring push. Coffee in SF?
 
-WHY THIS ONE (Score: 9/10):
-Most specific references (conference name, exact metric, funding
-amount with date). Natural peer-to-peer tone. Strong hook with
-1B+ QPS stat. Clear, casual CTA.
+SCORE: 9/10
 
-WHY NOT OTHERS:
-Variant 1: too generic (just mentioned "ML experience")
-Variant 2: weak CTA ("let me know if interested")
-Variant 3: too formal ("I hope this finds you well")
-Variant 4: too sales-y ("explore synergies")
+REASONING:
+- Most specific references (conference, metric, funding with date)
+- Natural peer-to-peer tone
+- Strong technical hook
+- Clear, casual CTA
+
+REJECTED:
+Variant 2: Generic opening
+Variant 3: Weak CTA
+Variant 4: Too formal
+Variant 5: Sales-y language
 ```
 
 ---
 
-## 🏢 Perfect for Agencies
+## Feedback Loops
 
-### Client A: Tech Startups
-```yaml
-# config_techcorp.yaml
-message_rules:
-  tone: "casual and friendly"
-  cta_style: "casual coffee chat"
-  max_words: 80
-```
+### Retry with Enhanced Prompts
 
-### Client B: Enterprise/Finance
-```yaml
-# config_finance.yaml
-message_rules:
-  tone: "professional but approachable"
-  cta_style: "15-min scheduled call"
-  max_words: 100
-```
+If supervisor rejects output, it can:
 
-Load different configs:
+**1. Provide specific feedback:**
 ```python
-CONFIG = load_config("config_techcorp.yaml")
+if review.rejected:
+    feedback = "Too generic. Must reference specific recent activity with dates."
+    # Retry with feedback injected into prompt
+    variants = generate_message_variants(
+        profile,
+        research,
+        previous_feedback=feedback
+    )
+```
+
+**2. Adjust parameters:**
+```python
+if variants_too_similar:
+    temperature = 0.9  # Increase creativity
+    num_variants = 7   # Generate more options
+```
+
+**3. Add examples:**
+```python
+if quality_low:
+    prompt += """
+GOOD EXAMPLE:
+"Saw your talk at AI Summit on vector DB optimization. That 1B+ QPS stat was wild."
+
+BAD EXAMPLE:
+"I noticed you work in AI. Would love to connect."
+"""
+```
+
+### Multi-Level Retry Strategy
+
+```python
+# Attempt 1: Standard generation
+variants = generate_variants(profile, research)
+
+# Review fails
+if score < 7:
+    # Attempt 2: Add specificity requirement
+    variants = generate_variants(
+        profile,
+        research,
+        rules="Must include 2 specific dates/numbers"
+    )
+
+# Still fails
+if score < 7:
+    # Attempt 3: Provide failed example + correction
+    variants = generate_variants(
+        profile,
+        research,
+        failed_example=previous_output,
+        correction="This was too generic. Be more specific about..."
+    )
+
+# Max retries
+if attempts >= 3:
+    escalate_to_human_review()
 ```
 
 ---
 
-## 📁 Project Structure
+## Clay Integration
+
+Flask API with queue system for processing employee lists from Clay.
+
+**Flow:**
+1. Clay sends list of employees (same company)
+2. API queues request (prevents rate limits)
+3. Research company once (shared across all employees)
+4. Score each employee (0-100) based on:
+   - Seniority/decision-making power (30%)
+   - Role relevance (25%)
+   - Profile completeness (20%)
+   - Response likelihood (25%)
+5. Select top N (default: 3 with score >= 70)
+6. Generate personalized messages for selected
+7. Send results to webhook (one POST per employee)
+
+**Scoring Example:**
+```
+Mark Otieno (CTO): 95/100 → SELECTED
+  Reasoning: C-level with strong technical background, active on LinkedIn,
+  relevant experience in digital transformation
+
+Robin Hoffmann (CTO): 90/100 → SELECTED
+  Reasoning: C-level role, focuses on tech innovation, profile indicates
+  decision-making authority
+
+Karen Scholl (VP Digital): 75/100 → SELECTED
+  Reasoning: Senior role with digital focus, complete profile, relevant
+  experience but slightly lower response likelihood
+
+Eddie Wright (Director): 68/100 → NOT SELECTED
+  Reasoning: Director-level but incomplete profile, below threshold
+
+Diane Jones (Director): 65/100 → NOT SELECTED
+  Reasoning: Generic title, limited profile information
+
+Kenneth Mitchell (CMO): 60/100 → NOT SELECTED
+  Reasoning: CMO role less relevant to technical offering
+```
+
+**Webhook Response:**
+```json
+{
+  "vmid": "...",
+  "fullName": "Mark Otieno",
+  "title": "Chief Technology Officer",
+  "selected": true,
+  "selection_reasoning": "Score: 95/100. CTO with strong digital transformation background...",
+  "message": "Saw your AI Summit talk on vector DBs...",
+  "message_score": 9,
+  "error": ""
+}
+```
+
+See [API.md](API.md) for detailed API documentation.
+
+---
+
+## Cost Analysis
+
+**Per Profile (Verbalized Sampling):**
+- Research (Perplexity Sonar): $0.01
+- Generation (GPT-4o, 5 variants): $0.025
+- Selection (GPT-4o): $0.005
+- **Total: $0.04 per profile**
+
+**Using GPT-4o-mini:**
+- Generation: $0.0025
+- Selection: $0.0005
+- **Total: $0.005 per profile** (8x cheaper)
+
+**Batch Processing (100 profiles):**
+- GPT-4o: $4.00
+- GPT-4o-mini: $0.50
+
+**Clay API Mode (per company, 6 employees, 3 selected):**
+- Company research: $0.01 (once)
+- Employee scoring: $0.005
+- Message generation: $0.075 (3 × $0.025)
+- **Total: $0.09 per company**
+
+---
+
+## Technical Details
+
+**Stack:**
+- LangChain v1 with `create_agent`
+- OpenAI GPT-4o (generation, selection)
+- Perplexity Sonar (research)
+- Pydantic (structured outputs, validation)
+- Flask (API mode)
+- YAML (configuration)
+
+**Structured Outputs:**
+All LLM calls return Pydantic models:
+```python
+class OutreachMessage(BaseModel):
+    message: str
+    profile_references: list[str]
+    research_references: list[str]
+    quality_score: int
+
+class SelectedMessage(BaseModel):
+    message: str
+    reason: str
+    rejected_reasons: str
+    score: int
+```
+
+**State Management:**
+- Standalone: In-memory (no persistence)
+- API: Queue-based with background worker thread
+- Optional: Add checkpointing for long-running workflows
+
+---
+
+## Project Structure
 
 ```
-├── main.py                   # Main agent code (370 lines)
-├── config.yaml              # All settings (models, tone, batch)
-├── prompts.yaml             # All prompts (with examples)
+├── main.py                   # Standalone CLI agent
+├── api.py                    # Flask API for Clay integration
+├── config.yaml              # All configuration
+├── prompts.yaml             # All prompts and examples
 ├── requirements.txt         # Dependencies
+├── Procfile                 # Railway deployment config
 ├── README.md               # This file
-├── QUICKSTART.md           # Detailed usage guide
-├── DEBUG_OPTIONS.md        # Debug configuration guide
-└── VERBALIZED_SAMPLING.md  # Deep dive on technique
+├── API.md                  # API documentation
+├── QUICKSTART.md           # Usage guide
+├── DEBUG_OPTIONS.md        # Debug configuration
+└── VERBALIZED_SAMPLING.md  # Technical deep dive
 ```
 
 ---
 
-## 🚢 Deployment
+## Customization
 
-### Railway / Heroku / Cloud Run
-```bash
-# Install dependencies
-pip install -r requirements.txt
+### Add New Sub-Agent
 
-# Set environment variables
-OPENAI_API_KEY=sk-...
-PERPLEXITY_API_KEY=pplx-...
-
-# Run
-python main.py
-```
-
----
-
-## 🛠️ Customization
-
-### Add New Tool
 ```python
 @tool
-def search_crunchbase(company: str) -> str:
-    """Get funding data from Crunchbase."""
-    # Your implementation
-    return data
+def analyze_sentiment(message: str) -> str:
+    """Analyze message tone."""
+    llm = ChatOpenAI(model="gpt-4o")
+    result = llm.invoke([HumanMessage(content=f"Analyze tone: {message}")])
+    return result.content
 
-# Add to agent in main.py:
-tools=[..., search_crunchbase]
+# Add to agent tools
+agent = create_agent(
+    model=llm,
+    tools=[scrape, research, generate, select, analyze_sentiment]
+)
 ```
 
-### Add New Prompt Template
+### Modify Supervisor Logic
+
+```python
+# In prompts.yaml
+supervisor:
+  system: |
+    You coordinate sub-agents.
+
+    WORKFLOW:
+    1. scrape_profile(url)
+    2. research_company(company)
+    3. generate_variants(profile, research)
+    4. analyze_sentiment(variants)  # NEW STEP
+    5. select_best_message(variants, sentiment_analysis)
+
+    QUALITY GATES:
+    - Reject if sentiment score < 0.7
+    - Reject if variants have < 3 diversity score
+    - Max 2 retries per step
+```
+
+### Custom Feedback Loop
+
+```python
+def generate_with_retry(profile, research, max_attempts=3):
+    for attempt in range(max_attempts):
+        variants = generate_variants(profile, research)
+        review = review_quality(variants)
+
+        if review.approved:
+            return variants
+
+        # Inject feedback into next attempt
+        research += f"\nPREVIOUS FEEDBACK: {review.feedback}"
+
+    return None  # Failed after max attempts
+```
+
+---
+
+## Debug Options
+
+Control verbosity via `config.yaml`:
+
 ```yaml
-# prompts.yaml
-tools:
-  your_new_tool: |
-    Your prompt here with {variables}
+output:
+  verbose: true              # Progress messages
+  debug_mode: false          # Full LangChain trace
+  show_all_variants: false   # Display all 5 options
+  show_prompts: false        # Display prompts
+  show_tool_calls: false     # Display tool execution
 ```
 
-### Change Variant Count
-```yaml
-# prompts.yaml - generate 3 instead of 5
-generate_message_variants: |
-  Generate 3 different messages...  # Was 5
+**Example with `show_all_variants: true`:**
+```
+ALL 5 VARIANTS GENERATED:
+============================================================
+<response>
+  <message>Saw your AI Summit talk...</message>
+  <probability>0.08</probability>
+  <hook_type>observation</hook_type>
+</response>
+<response>
+  <message>Your post about RAG...</message>
+  <probability>0.06</probability>
+  <hook_type>question</hook_type>
+</response>
+... (3 more)
+============================================================
+
+SUPERVISOR'S SELECTION:
+Variant 1
+Score: 9/10
+Reasoning: Most specific references, natural tone, strong hook
+```
+
+See [DEBUG_OPTIONS.md](DEBUG_OPTIONS.md) for complete guide.
+
+---
+
+## Deployment
+
+### Railway
+
+```bash
+# Procfile automatically runs:
+gunicorn api:app --bind 0.0.0.0:$PORT --timeout 600 --workers 2
+
+# Set environment variables:
+OPENAI_API_KEY=sk-...
+PERPLEXITY_API_KEY=pplx-...
+```
+
+### Local
+
+```bash
+# Standalone
+python main.py
+
+# API mode
+python api.py
 ```
 
 ---
 
-## ⚠️ Important Notes
-
-- Replace `mock_linkedin_scraper()` with real API (Proxycurl, Bright Data, etc.)
-- Respect LinkedIn's ToS - always get consent before scraping
-- Use rate limiting (`batch.delay_seconds` in config)
-- Don't commit API keys (they're in `.gitignore`)
-
----
-
-## 🤝 Contributing
-
-This is a production-ready template. Feel free to:
-- Fork and customize for your use case
-- Add new tools (email scraper, CRM integration, etc.)
-- Improve prompts in `prompts.yaml`
-- Add new debug options in `config.yaml`
-
----
-
-## 📄 License
-
-MIT
-
----
-
-## 🔗 Resources
+## References
 
 - [Verbalized Sampling Paper](https://www.verbalized-sampling.com)
 - [LangChain Documentation](https://python.langchain.com)
-- [OpenAI API Docs](https://platform.openai.com/docs)
-- [Perplexity API Docs](https://docs.perplexity.ai)
+- [Supervisor Pattern](https://python.langchain.com/docs/tutorials/agents/)
 
 ---
 
-**Built for agencies that need personalized outreach at scale** 🚀
+## License
 
-Non-devs can edit prompts. Devs can extend functionality. Everyone wins.
+MIT
