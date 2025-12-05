@@ -74,6 +74,22 @@ output:
   export_format: "csv"  # Options: csv, json, markdown
 
 
+# ===== API CONFIGURATION =====
+# Settings for the Flask API (Clay integration)
+api:
+  # How many employees to select per company (top N by score)
+  max_targets_per_company: 3
+
+  # Minimum score to be selected (0-100)
+  min_score_threshold: 70
+
+  # Delay between processing different companies (seconds)
+  delay_between_companies: 5
+
+  # Delay between sending webhook responses (seconds)
+  delay_between_webhooks: 1
+
+
 # ===== API KEYS (optional - prefer env vars) =====
 # Leave empty to use environment variables (recommended)
 api_keys:

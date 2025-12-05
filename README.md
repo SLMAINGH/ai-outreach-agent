@@ -13,31 +13,53 @@ Perfect for agencies: non-devs can edit prompts/config, no code changes needed.
 - 🔧 **Debug Options** - See all variants, prompts, tool calls via config flags
 - 📊 **Batch Processing** - Process 100s of profiles, export to CSV
 - 🏢 **Agency-Ready** - Different configs per client, easy A/B testing
+- 🔌 **Clay Integration** - Flask API for webhooks, auto-scores employees, queues companies
 
 ---
 
 ## 🚀 Quick Start
 
-### 1. Install
+### Standalone Mode (CLI)
+
+1. **Install**
 ```bash
 pip install -r requirements.txt
 ```
 
-### 2. Set API Keys
+2. **Set API Keys**
 ```bash
 export OPENAI_API_KEY="sk-..."
 export PERPLEXITY_API_KEY="pplx-..."
 ```
 
-### 3. Run
+3. **Run**
 ```bash
 python main.py
 ```
+
+### API Mode (Clay Integration)
+
+1. **Deploy to Railway**
+   - Connect GitHub repo
+   - Set environment variables (API keys)
+   - Deploy
+
+2. **Configure Clay**
+   - Add HTTP API enrichment
+   - URL: `https://your-app.railway.app/process`
+   - Include `webhook_url` in request body
+
+3. **Receive Results**
+   - Get scored employees + messages via webhook
+   - One webhook call per employee
+
+See **[API.md](API.md)** for full Clay integration guide
 
 ---
 
 ## 📖 Documentation
 
+- **[API.md](API.md)** - Clay integration guide (Flask API, webhooks)
 - **[QUICKSTART.md](QUICKSTART.md)** - Installation, usage, configuration
 - **[DEBUG_OPTIONS.md](DEBUG_OPTIONS.md)** - See agent thinking, all 5 variants
 - **[VERBALIZED_SAMPLING.md](VERBALIZED_SAMPLING.md)** - How it works, why it's better
