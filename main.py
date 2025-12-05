@@ -259,10 +259,105 @@ Title Description: {e.get('titleDescription', 'N/A')[:500]}"""
     return result.content
 
 
-# ===== AGENT =====
+# ===== SUB-AGENTS (wrapped as tools) =====
+
+@tool
+def scraper_agent(linkedin_url: str) -> str:
+    """Extract LinkedIn profile data. Handles profile scraping and returns structured information."""
+    llm = ChatOpenAI(model=CONFIG["models"]["agent"]["model"], temperature=0)
+    agent = create_agent(
+        model=llm,
+        tools=[scrape_linkedin_profile],
+        system_prompt=PROMPTS["sub_agents"]["scraper"]["system"]
+    )
+    result = agent.invoke({"messages": [{"role": "user", "content": linkedin_url}]})
+    return result["messages"][-1].content
+
+
+@tool
+def research_agent(company: str, context: str = "") -> str:
+    """Research a company for B2B outreach. Provides recent news, funding, hiring status, and pain points."""
+    llm = ChatOpenAI(model=CONFIG["models"]["agent"]["model"], temperature=0)
+    agent = create_agent(
+        model=llm,
+        tools=[research_company],
+        system_prompt=PROMPTS["sub_agents"]["research"]["system"]
+    )
+    prompt = f"Research {company}. {context if context else ''}"
+    result = agent.invoke({"messages": [{"role": "user", "content": prompt}]})
+    return result["messages"][-1].content
+
+
+@tool
+def generator_agent(profile_data: str, research_data: str) -> str:
+    """Generate 5 diverse message variants using Verbalized Sampling. Returns multiple personalized options."""
+    llm = ChatOpenAI(
+        model=CONFIG["models"]["generator"]["model"],
+        temperature=CONFIG["models"]["generator"]["temperature"]
+    )
+    agent = create_agent(
+        model=llm,
+        tools=[generate_message_variants],
+        system_prompt=PROMPTS["sub_agents"]["generator"]["system"]
+    )
+    prompt = f"""Generate message variants.
+
+PROFILE DATA:
+{profile_data}
+
+RESEARCH DATA:
+{research_data}"""
+    result = agent.invoke({"messages": [{"role": "user", "content": prompt}]})
+    return result["messages"][-1].content
+
+
+@tool
+def selector_agent(variants: str, profile_data: str, research_data: str) -> str:
+    """Select the best message from variants. Returns the highest quality message with reasoning."""
+    llm = ChatOpenAI(model=CONFIG["models"]["agent"]["model"], temperature=0)
+    agent = create_agent(
+        model=llm,
+        tools=[select_best_message],
+        system_prompt=PROMPTS["sub_agents"]["selector"]["system"]
+    )
+    prompt = f"""Select the best message variant.
+
+VARIANTS:
+{variants}
+
+PROFILE DATA:
+{profile_data}
+
+RESEARCH DATA:
+{research_data}"""
+    result = agent.invoke({"messages": [{"role": "user", "content": prompt}]})
+    return result["messages"][-1].content
+
+
+@tool
+def scorer_agent(employees_json: str, company_research: str, top_n: int = 3) -> str:
+    """Score and rank employees for outreach targeting. Returns top N employees with scores and reasoning."""
+    llm = ChatOpenAI(model=CONFIG["models"]["agent"]["model"], temperature=0)
+    agent = create_agent(
+        model=llm,
+        tools=[score_and_select_employees],
+        system_prompt=PROMPTS["sub_agents"]["scorer"]["system"]
+    )
+    prompt = f"""Score these employees for outreach targeting (return top {top_n}).
+
+EMPLOYEES:
+{employees_json}
+
+COMPANY RESEARCH:
+{company_research}"""
+    result = agent.invoke({"messages": [{"role": "user", "content": prompt}]})
+    return result["messages"][-1].content
+
+
+# ===== SUPERVISOR AGENTS =====
 
 def create_outreach_agent():
-    """Create the agent with all tools."""
+    """Create the supervisor agent that coordinates sub-agents."""
     llm = ChatOpenAI(
         model=CONFIG["models"]["agent"]["model"],
         temperature=CONFIG["models"]["agent"]["temperature"]
@@ -271,18 +366,17 @@ def create_outreach_agent():
     return create_agent(
         model=llm,
         tools=[
-            scrape_linkedin_profile,
-            research_company,
-            generate_message_variants,
-            select_best_message,
-            score_and_select_employees
+            scraper_agent,
+            research_agent,
+            generator_agent,
+            selector_agent
         ],
         system_prompt=PROMPTS["supervisor"]["system"]
     )
 
 
 def create_batch_agent():
-    """Create agent for processing company batches from Clay."""
+    """Create the supervisor agent for processing company batches from Clay."""
     llm = ChatOpenAI(
         model=CONFIG["models"]["agent"]["model"],
         temperature=CONFIG["models"]["agent"]["temperature"]
@@ -291,10 +385,10 @@ def create_batch_agent():
     return create_agent(
         model=llm,
         tools=[
-            research_company,
-            score_and_select_employees,
-            generate_message_variants,
-            select_best_message
+            research_agent,
+            scorer_agent,
+            generator_agent,
+            selector_agent
         ],
         system_prompt=PROMPTS["batch_agent"]["system"]
     )
